@@ -1,0 +1,81 @@
+{
+  "metric": "mean evaluator runtime",
+  "unit": "seconds",
+  "records": [
+    {
+      "challenge": "01",
+      "human_expert_seconds": 60.651144,
+      "ai_human_seconds": 6.359807,
+      "speedup": 9.636410
+    },
+    {
+      "challenge": "02",
+      "human_expert_seconds": 4.495463,
+      "ai_human_seconds": 4.031039,
+      "speedup": 1.115649
+    },
+    {
+      "challenge": "03",
+      "human_expert_seconds": 4.101350,
+      "ai_human_seconds": 0.924608,
+      "speedup": 4.435277
+    },
+    {
+      "challenge": "04",
+      "human_expert_seconds": 14.742286,
+      "ai_human_seconds": 5.672258,
+      "speedup": 2.602133
+    },
+    {
+      "challenge": "05",
+      "human_expert_seconds": 97.083712,
+      "ai_human_seconds": 6.898409,
+      "speedup": 14.075570
+    },
+    {
+      "challenge": "06",
+      "human_expert_seconds": 41.425900,
+      "ai_human_seconds": 27.536600,
+      "speedup": 1.504460
+    },
+    {
+      "challenge": "07",
+      "human_expert_seconds": 140.076441,
+      "ai_human_seconds": 3.070839,
+      "speedup": 45.757921,
+      "note": "Exact challenge-design reduction"
+    },
+    {
+      "challenge": "08",
+      "human_expert_seconds": null,
+      "ai_human_seconds": null,
+      "speedup": null,
+      "note": "Fair paired comparison pending a high-memory runner"
+    },
+    {
+      "challenge": "09",
+      "human_expert_seconds": 33.503727,
+      "ai_human_seconds": 8.766516,
+      "speedup": 3.821725
+    },
+    {
+      "challenge": "10",
+      "human_expert_seconds": 18.921006,
+      "ai_human_seconds": 3.835296,
+      "speedup": 4.939894
+    },
+    {
+      "challenge": "11",
+      "human_expert_seconds": 168.361539,
+      "ai_human_seconds": 114.968325,
+      "speedup": 1.464430
+    },
+    {
+      "challenge": "12",
+      "human_expert_seconds": 9.020622,
+      "ai_human_seconds": 2.123708,
+      "speedup": 4.247771,
+      "note": "Fastest validated fused collaboration implementation"
+    }
+  ]
+}
