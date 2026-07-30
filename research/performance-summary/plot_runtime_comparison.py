@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the expert-versus-collaboration runtime comparison."""
+"""Render linear- and log-scale expert-versus-collaboration runtime bars."""
 
 from __future__ import annotations
 
@@ -19,57 +19,48 @@ HERE = Path(__file__).resolve().parent
 DATA_PATH = HERE / "runtime-comparison-data.json"
 OUTPUT_DIR = HERE / "figures"
 
-# ORBIT-Q visual language: Okabe-Ito colors, black outlines, light grid,
-# DejaVu Sans typography, and uncluttered axes.
+# ORBIT-Q visual language: Okabe–Ito colors, black outlines, light grid,
+# sans-serif typography, and uncluttered axes.
 HUMAN_COLOR = "#D55E00"
 COLLAB_COLOR = "#0072B2"
-GRID_COLOR = "#DDDDDD"
+GRID_COLOR = "#DEDEDE"
 TEXT_COLOR = "#222222"
 
 
 def _runtime_label(value: float) -> str:
-    return f"{value:.2f}" if value < 10 else f"{value:.1f}"
+    if value < 10:
+        return f"{value:.2f}"
+    return f"{value:.1f}"
 
 
-def main() -> None:
+def _load_records() -> list[dict[str, object]]:
     payload = json.loads(DATA_PATH.read_text(encoding="utf-8"))
     records = payload["records"]
+    for record in records:
+        if record["human_expert_seconds"] <= 0 or record["ai_human_seconds"] <= 0:
+            raise ValueError("Runtime values must be strictly positive")
+        if record["mean_paired_speedup"] <= 0:
+            raise ValueError("Paired speedups must be strictly positive")
+    return records
 
-    challenges = [record["challenge"] for record in records]
+
+def _render(records: list[dict[str, object]], scale: str) -> None:
+    if scale not in {"linear", "log"}:
+        raise ValueError(f"Unsupported scale: {scale}")
+
+    challenges = [str(record["challenge"]) for record in records]
     human = np.array(
-        [
-            np.nan
-            if record["human_expert_seconds"] is None
-            else record["human_expert_seconds"]
-            for record in records
-        ],
+        [float(record["human_expert_seconds"]) for record in records],
         dtype=float,
     )
     collaboration = np.array(
-        [
-            np.nan
-            if record["ai_human_seconds"] is None
-            else record["ai_human_seconds"]
-            for record in records
-        ],
+        [float(record["ai_human_seconds"]) for record in records],
         dtype=float,
-    )
-
-    mpl.rcParams.update(
-        {
-            "font.family": "DejaVu Sans",
-            "font.size": 10.5,
-            "axes.labelsize": 11,
-            "axes.titlesize": 11.5,
-            "legend.fontsize": 9.5,
-            "svg.fonttype": "none",
-            "pdf.fonttype": 42,
-        }
     )
 
     x = np.arange(len(records), dtype=float)
     width = 0.36
-    fig, ax = plt.subplots(figsize=(12.8, 5.9), facecolor="white")
+    fig, ax = plt.subplots(figsize=(7.2, 4.0), facecolor="white")
     ax.set_facecolor("white")
 
     human_bars = ax.bar(
@@ -78,7 +69,7 @@ def main() -> None:
         width,
         color=HUMAN_COLOR,
         edgecolor="black",
-        linewidth=0.7,
+        linewidth=0.55,
         label="Human expert",
         zorder=3,
     )
@@ -88,101 +79,129 @@ def main() -> None:
         width,
         color=COLLAB_COLOR,
         edgecolor="black",
-        linewidth=0.7,
+        linewidth=0.55,
         label="AI–human optimized",
         zorder=3,
     )
 
-    ax.set_yscale("log")
-    ax.set_ylim(0.55, 390)
-    ax.set_yticks([1, 3, 10, 30, 100, 300])
-    ax.yaxis.set_major_formatter(ScalarFormatter())
-    ax.minorticks_off()
-    ax.grid(axis="y", color=GRID_COLOR, linewidth=0.8, zorder=0)
+    if scale == "log":
+        ax.set_yscale("log")
+        ax.set_ylim(0.65, 315)
+        ax.set_yticks([1, 3, 10, 30, 100, 300])
+        ax.yaxis.set_major_formatter(ScalarFormatter())
+        ax.minorticks_off()
+        ylabel = "Mean evaluator runtime (s; log scale)"
+    else:
+        ax.set_ylim(0, 205)
+        ax.set_yticks([0, 50, 100, 150, 200])
+        ylabel = "Mean evaluator runtime (s)"
 
+    ax.grid(axis="y", color=GRID_COLOR, linewidth=0.65, zorder=0)
     ax.set_xticks(x, challenges)
     ax.set_xlabel("Challenge")
-    ax.set_ylabel("Mean evaluator runtime (s, log scale)")
-    ax.set_title(
-        "Human expert versus AI–human optimized runtime",
-        fontweight="bold",
-        pad=12,
-    )
+    ax.set_ylabel(ylabel)
 
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
     for side in ("left", "bottom"):
         ax.spines[side].set_color("black")
-        ax.spines[side].set_linewidth(1.0)
+        ax.spines[side].set_linewidth(0.9)
     ax.tick_params(colors=TEXT_COLOR)
 
     for index, record in enumerate(records):
-        expert_time = record["human_expert_seconds"]
-        optimized_time = record["ai_human_seconds"]
-        speedup = record["speedup"]
+        expert_time = float(record["human_expert_seconds"])
+        optimized_time = float(record["ai_human_seconds"])
+        paired_speedup = float(record["mean_paired_speedup"])
 
-        if expert_time is None or optimized_time is None:
-            ax.text(
-                x[index],
-                1.05,
-                "pending\nhigh-memory run",
-                ha="center",
-                va="center",
-                fontsize=7.8,
-                color="#666666",
-                fontstyle="italic",
-                linespacing=1.05,
-            )
-            continue
+        if scale == "log":
+            human_y = expert_time * 1.07
+            collaboration_y = optimized_time * 1.07
+            speedup_y = max(expert_time, optimized_time) * 1.40
+        else:
+            human_y = expert_time + 2.2
+            collaboration_y = optimized_time + 2.2
+            speedup_y = max(expert_time, optimized_time) + 12.5
+
+        # Separate labels slightly when the paired bars are almost equal height.
+        # This is most visible for Challenge 08 and avoids a false merged value.
+        close_pair = max(expert_time, optimized_time) / min(
+            expert_time, optimized_time
+        ) < 1.15
+        label_nudge = 0.04 if close_pair else 0.0
 
         ax.text(
-            human_bars[index].get_x() + human_bars[index].get_width() / 2,
-            expert_time * 1.08,
+            human_bars[index].get_x()
+            + human_bars[index].get_width() / 2
+            - label_nudge,
+            human_y,
             _runtime_label(expert_time),
             ha="center",
             va="bottom",
-            fontsize=7.5,
+            fontsize=6.2,
             color=TEXT_COLOR,
         )
         ax.text(
             collaboration_bars[index].get_x()
-            + collaboration_bars[index].get_width() / 2,
-            optimized_time * 1.08,
+            + collaboration_bars[index].get_width() / 2
+            + label_nudge,
+            collaboration_y,
             _runtime_label(optimized_time),
             ha="center",
             va="bottom",
-            fontsize=7.5,
+            fontsize=6.2,
             color=TEXT_COLOR,
         )
         ax.text(
             x[index],
-            max(expert_time, optimized_time) * 1.52,
-            f"{speedup:.2f}×",
+            speedup_y,
+            f"{paired_speedup:.2f}×",
             ha="center",
             va="bottom",
-            fontsize=8.0,
+            fontsize=6.8,
             color=TEXT_COLOR,
             fontweight="bold",
         )
 
     ax.legend(
         loc="upper center",
-        bbox_to_anchor=(0.5, 1.005),
+        bbox_to_anchor=(0.5, 1.08),
         ncol=2,
         frameon=False,
-        handlelength=1.6,
-        columnspacing=2.2,
+        handlelength=1.5,
+        columnspacing=2.0,
     )
-    ax.margins(x=0.02)
-
-    fig.tight_layout(rect=(0.02, 0.02, 0.995, 0.97))
+    ax.margins(x=0.018)
+    fig.tight_layout(rect=(0.01, 0.01, 0.995, 0.95))
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_stem = OUTPUT_DIR / "expert-vs-collaboration-runtime-bars"
-    fig.savefig(f"{output_stem}.png", dpi=220, bbox_inches="tight")
+    output_stem = OUTPUT_DIR / f"expert-vs-collaboration-runtime-bars-{scale}"
+    fig.savefig(f"{output_stem}.png", dpi=600, bbox_inches="tight")
     fig.savefig(f"{output_stem}.pdf", bbox_inches="tight")
     fig.savefig(f"{output_stem}.svg", bbox_inches="tight")
     plt.close(fig)
+
+
+def main() -> None:
+    mpl.rcParams.update(
+        {
+            "font.family": "sans-serif",
+            "font.sans-serif": [
+                "Arial",
+                "Helvetica",
+                "DejaVu Sans",
+                "sans-serif",
+            ],
+            "font.size": 7.2,
+            "axes.labelsize": 8,
+            "legend.fontsize": 7.2,
+            "svg.fonttype": "none",
+            "pdf.fonttype": 42,
+            "savefig.dpi": 600,
+        }
+    )
+    records = _load_records()
+    _render(records, "log")
+    _render(records, "linear")
 
 
 if __name__ == "__main__":
